@@ -61,9 +61,31 @@ app.post('/options', async (req, res) => {
   const { stock } = req.body;
   console.log("📩 Received options request for:", stock);
 
-  const prompt = `Create a basic options trading strategy for ${stock} using current market conditions. Include entry price, expiration range, and reasoning.`;
-
   try {
+    const fmpResponse = await axios.get(
+      `https://financialmodelingprep.com/api/v3/quote/${stock}?apikey=${process.env.FMP_API_KEY}`
+    );
+
+    const quote = fmpResponse.data[0];
+    if (!quote) {
+      console.warn("⚠️ No quote found for:", stock);
+      return res.json({ message: "⚠️ Invalid stock symbol or no data available." });
+    }
+
+    const currentPrice = quote.price;
+    if (currentPrice === undefined) {
+      console.warn("⚠️ No price field found in quote:", quote);
+      return res.json({ message: "⚠️ Stock data unavailable or malformed response." });
+    }
+
+    console.log("💰 Current Price (Options):", currentPrice);
+
+    const prompt = `
+      Stock symbol: ${stock}
+      Current price: $${currentPrice.toFixed(2)}
+      Based on this info, create a basic options trading strategy. Include entry price, expiration range, and a brief explanation.
+    `;
+
     const aiResponse = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [{ role: "user", content: prompt }],
