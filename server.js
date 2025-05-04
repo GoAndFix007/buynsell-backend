@@ -24,7 +24,7 @@ app.post('/gpt', async (req, res) => {
   `https://financialmodelingprep.com/api/v3/quote/${stock}?apikey=${process.env.FMP_API_KEY}`
 );
 
-    const quote = response.data.quoteResponse.result[0];
+    const quote = fmpResponse.data[0];
     if (!quote) {
       console.warn("⚠️ No quote found for:", stock);
       return res.json({ message: "⚠️ Invalid stock symbol or no data available." });
