@@ -29,8 +29,11 @@ app.post('/gpt', async (req, res) => {
       console.warn("⚠️ No quote found for:", stock);
       return res.json({ message: "⚠️ Invalid stock symbol or no data available." });
     }
-
-    const currentPrice = quote.regularMarketPrice;
+    const currentPrice = quote.price;
+    if (currentPrice === undefined) {
+      console.warn("⚠️ No price field found in quote:", quote);
+      return res.json({ message: "⚠️ Stock data unavailable or malformed response." });
+}
     console.log("💰 Current Price:", currentPrice);
 
     const prompt = `
