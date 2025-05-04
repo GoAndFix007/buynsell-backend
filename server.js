@@ -20,9 +20,9 @@ app.post('/gpt', async (req, res) => {
   console.log("📩 Received request for stock:", stock);
 
   try {
-    const response = await axios.get(
-      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${stock}`
-    );
+  const fmpResponse = await axios.get(
+  `https://financialmodelingprep.com/api/v3/quote/${stock}?apikey=${process.env.FMP_API_KEY}`
+);
 
     const quote = response.data.quoteResponse.result[0];
     if (!quote) {
