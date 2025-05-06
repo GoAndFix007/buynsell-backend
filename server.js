@@ -16,9 +16,18 @@ function calculatePercentChange(current, target) {
   return (((target - current) / current) * 100).toFixed(2);
 }
 
+// Expanded stock universe for variety (mix of large and mid cap)
+const universe = [
+  'AAPL', 'MSFT', 'TSLA', 'NVDA', 'AMZN',
+  'GOOGL', 'META', 'NFLX', 'AMD', 'CRM',
+  'INTC', 'ADBE', 'PYPL', 'SQ', 'SHOP',
+  'UBER', 'F', 'GM', 'NEE', 'PLTR'
+];
+
 app.get('/top5', async (req, res) => {
   try {
-    const symbols = ['AAPL', 'MSFT', 'TSLA', 'NVDA', 'AMZN'];
+    // Randomly select 5 tickers from the universe
+    const symbols = universe.sort(() => 0.5 - Math.random()).slice(0, 5);
     const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${symbols.join(',')}?apikey=${FMP_API_KEY}`;
     const response = await axios.get(quoteUrl);
     const quotes = response.data;
