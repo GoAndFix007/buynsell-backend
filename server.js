@@ -16,20 +16,16 @@ function calculatePercentChange(current, target) {
   return (((target - current) / current) * 100).toFixed(2);
 }
 
-// Expanded stock universe for variety (mix of large and mid cap)
-const universe = [
-  'AAPL', 'MSFT', 'TSLA', 'NVDA', 'AMZN',
-  'GOOGL', 'META', 'NFLX', 'AMD', 'CRM',
-  'INTC', 'ADBE', 'PYPL', 'SQ', 'SHOP',
-  'UBER', 'F', 'GM', 'NEE', 'PLTR'
-];
-
 app.get('/top5', async (req, res) => {
   try {
-    const symbols = universe.sort(() => 0.5 - Math.random()).slice(0, 5);
-    const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${symbols.join(',')}?apikey=${FMP_API_KEY}`;
+    const volumeUrl = `https://financialmodelingprep.com/api/v3/actives?apikey=${FMP_API_KEY}`;
+    const volumeResponse = await axios.get(volumeUrl);
+    const actives = volumeResponse.data.filter(stock => stock.price > 5 && stock.marketCap > 2000000000); // filter penny stocks & low caps
+
+    const topSymbols = actives.slice(0, 10).map(stock => stock.ticker); // pick top 10 by volume
+    const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${topSymbols.join(',')}?apikey=${FMP_API_KEY}`;
     const response = await axios.get(quoteUrl);
-    const quotes = response.data;
+    const quotes = response.data.slice(0, 5); // get details for first 5
 
     const ideas = quotes.map((q, i) => {
       const gainMultiplier = 1 + (Math.random() * 0.06 + 0.06); // 6%–12%
@@ -45,8 +41,7 @@ ${i + 1}️⃣ ${q.symbol} (${q.name})
 💵 Current Price: $${q.price.toFixed(2)}
 🎯 Target Price: $${target} (+${gainPct}%)
 🛑 Stop Loss Price: $${stopLoss} (-${Math.abs(lossPct)}%)
-🧠 Reason: ${q.name} is exhibiting a trend that makes it attractive for a swing trade based on current technicals and sentiment.
-`;
+🧠 Reason: ${q.name} is experiencing strong volume and favorable short-term sentiment, making it an attractive swing candidate.`;
     });
 
     res.json({ message: ideas.join('\n') });
@@ -79,8 +74,7 @@ app.post('/gpt', async (req, res) => {
 💵 Current Price: $${price.toFixed(2)}
 🎯 Target Price: $${target} (+${gainPct}%)
 🛑 Stop Loss Price: $${stop} (${lossPct}%)
-🧠 Reasoning: ${stock} has shown favorable technical indicators and market sentiment suggesting short-term upside potential. Consider this a swing opportunity over the next 5–7 days.
-`;
+🧠 Reasoning: ${stock} has shown favorable technical indicators and market sentiment suggesting short-term upside potential. Consider this a swing opportunity over the next 5–7 days.`;
 
     res.json({ message });
   } catch (err) {
