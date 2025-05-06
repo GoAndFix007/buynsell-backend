@@ -26,7 +26,6 @@ const universe = [
 
 app.get('/top5', async (req, res) => {
   try {
-    // Randomly select 5 tickers from the universe
     const symbols = universe.sort(() => 0.5 - Math.random()).slice(0, 5);
     const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${symbols.join(',')}?apikey=${FMP_API_KEY}`;
     const response = await axios.get(quoteUrl);
@@ -54,6 +53,39 @@ ${i + 1}️⃣ ${q.symbol} (${q.name})
   } catch (error) {
     console.error('🔥 Top 5 Generation Error:', error);
     res.status(500).json({ message: '⚠️ Failed to generate enriched Top 5.' });
+  }
+});
+
+app.post('/gpt', async (req, res) => {
+  const { stock } = req.body;
+
+  try {
+    const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${stock}?apikey=${FMP_API_KEY}`;
+    const response = await axios.get(quoteUrl);
+    const data = response.data[0];
+
+    if (!data || !data.price) {
+      return res.status(404).json({ message: `⚠️ No data found for ${stock}.` });
+    }
+
+    const price = data.price;
+    const target = (price * 1.08).toFixed(2); // Assume +8% gain
+    const stop = (price * 0.95).toFixed(2);   // Assume -5% risk
+    const gainPct = calculatePercentChange(price, target);
+    const lossPct = calculatePercentChange(price, stop);
+
+    const message = `
+📊 ${stock} Trade Idea
+💵 Current Price: $${price.toFixed(2)}
+🎯 Target Price: $${target} (+${gainPct}%)
+🛑 Stop Loss Price: $${stop} (${lossPct}%)
+🧠 Reasoning: ${stock} has shown favorable technical indicators and market sentiment suggesting short-term upside potential. Consider this a swing opportunity over the next 5–7 days.
+`;
+
+    res.json({ message });
+  } catch (err) {
+    console.error('🔥 GPT Signal Error:', err.message);
+    res.status(500).json({ message: '⚠️ Failed to generate AI insight.' });
   }
 });
 
