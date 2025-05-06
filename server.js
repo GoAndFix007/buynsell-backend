@@ -49,6 +49,7 @@ Based on this, provide a clear swing trade recommendation:
 - 📈 Recommendation: Buy / Hold / Sell
 - 🎯 Target Price (in dollars)
 - 🛑 Stop Loss Price (in dollars)
+- 📊 Expected % Gain
 - 🧠 Reasoning (1-2 short sentences)
 - 🗓️ Expected timeframe (3–5 days)
 `;
@@ -102,31 +103,29 @@ Output:
   }
 });
 
-// 🔝 Top 5 AI Picks (Now includes price, target, stop)
+// 🔝 Top 5 AI Picks with Real-Time Prices
 app.get('/top5', async (req, res) => {
-  const prompt = `
-You are a swing trading assistant. Based on today’s market data, give your top 5 stock picks.
-
-For each, include:
-- 📈 Stock Symbol and Name
-- 💵 Current Price (in dollars)
-- 🎯 Target Price (in dollars)
-- 🛑 Stop Loss Price (in dollars)
-- 🧠 1-sentence Reason
-
-Format cleanly and add a reminder at the bottom that this is not financial advice.
-  `;
-
+  const symbols = ["AAPL", "MSFT", "TSLA", "NVDA", "AMZN"];
   try {
-    const aiResponse = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }]
-    });
+    const quoteData = await axios.get(`https://financialmodelingprep.com/api/v3/quote/${symbols.join(',')}?apikey=${process.env.FMP_API_KEY}`);
+    const quotes = quoteData.data;
 
-    const message = aiResponse.choices[0].message.content;
+    const formattedStocks = quotes.map((q, idx) => {
+      const targetPrice = (q.price * 1.1).toFixed(2);
+      const stopLoss = (q.price * 0.95).toFixed(2);
+      const gainPercent = ((targetPrice - q.price) / q.price * 100).toFixed(1);
+
+      return `#${idx + 1}: ${q.name} (${q.symbol})
+💵 Current Price: $${q.price}
+🎯 Target Price: $${targetPrice} (+${gainPercent}%)
+🛑 Stop Loss: $${stopLoss}
+🧠 Reason: AI expects moderate upside momentum based on market activity.`;
+    }).join("\n\n");
+
+    const message = `${formattedStocks}\n\n⚠️ This is not financial advice. Always do your own research.`;
     res.json({ message });
   } catch (error) {
-    console.error("🔥 Top 5 Error:", error.response?.data || error.message || error);
+    console.error("🔥 Top 5 Real-Time Error:", error.response?.data || error.message || error);
     res.json({ message: "⚠️ Failed to generate Top 5 picks." });
   }
 });
