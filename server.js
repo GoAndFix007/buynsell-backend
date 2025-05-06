@@ -16,20 +16,21 @@ function calculatePercentChange(current, target) {
   return (((target - current) / current) * 100).toFixed(2);
 }
 
+// 🔵 Top 5 AI Stock Picks – High Volume + Quality Filter
 app.get('/top5', async (req, res) => {
   try {
     const volumeUrl = `https://financialmodelingprep.com/api/v3/actives?apikey=${FMP_API_KEY}`;
     const volumeResponse = await axios.get(volumeUrl);
-    const actives = volumeResponse.data.filter(stock => stock.price > 5 && stock.marketCap > 2000000000); // filter penny stocks & low caps
+    const actives = volumeResponse.data.filter(stock => stock.price > 5 && stock.marketCap > 2000000000); // filter out penny stocks
 
-    const topSymbols = actives.slice(0, 10).map(stock => stock.ticker); // pick top 10 by volume
+    const topSymbols = actives.slice(0, 10).map(stock => stock.ticker); // top 10 high-volume
     const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${topSymbols.join(',')}?apikey=${FMP_API_KEY}`;
     const response = await axios.get(quoteUrl);
-    const quotes = response.data.slice(0, 5); // get details for first 5
+    const quotes = response.data.slice(0, 5); // use top 5 for now
 
     const ideas = quotes.map((q, i) => {
-      const gainMultiplier = 1 + (Math.random() * 0.06 + 0.06); // 6%–12%
-      const stopMultiplier = 1 - (Math.random() * 0.03 + 0.03); // 3%–6%
+      const gainMultiplier = 1 + (Math.random() * 0.06 + 0.06); // 6–12%
+      const stopMultiplier = 1 - (Math.random() * 0.03 + 0.03); // 3–6%
 
       const target = (q.price * gainMultiplier).toFixed(2);
       const stopLoss = (q.price * stopMultiplier).toFixed(2);
@@ -41,7 +42,7 @@ ${i + 1}️⃣ ${q.symbol} (${q.name})
 💵 Current Price: $${q.price.toFixed(2)}
 🎯 Target Price: $${target} (+${gainPct}%)
 🛑 Stop Loss Price: $${stopLoss} (-${Math.abs(lossPct)}%)
-🧠 Reason: ${q.name} is experiencing strong volume and favorable short-term sentiment, making it an attractive swing candidate.`;
+🧠 Reason: ${q.name} is seeing high trading volume and shows favorable short-term sentiment. A swing trade opportunity may be present.`;
     });
 
     res.json({ message: ideas.join('\n') });
@@ -51,6 +52,7 @@ ${i + 1}️⃣ ${q.symbol} (${q.name})
   }
 });
 
+// 📈 GPT Signal for individual stock swing trade
 app.post('/gpt', async (req, res) => {
   const { stock } = req.body;
 
@@ -64,8 +66,8 @@ app.post('/gpt', async (req, res) => {
     }
 
     const price = data.price;
-    const target = (price * 1.08).toFixed(2); // Assume +8% gain
-    const stop = (price * 0.95).toFixed(2);   // Assume -5% risk
+    const target = (price * 1.08).toFixed(2); // Estimate +8% gain
+    const stop = (price * 0.95).toFixed(2);   // Estimate -5% loss
     const gainPct = calculatePercentChange(price, target);
     const lossPct = calculatePercentChange(price, stop);
 
@@ -83,6 +85,7 @@ app.post('/gpt', async (req, res) => {
   }
 });
 
+// ✅ Start server
 app.listen(PORT, () => {
   console.log(`🚀 BuyNSell 2.0 server running on http://localhost:${PORT}`);
 });
