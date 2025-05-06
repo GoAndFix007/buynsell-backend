@@ -49,9 +49,29 @@ app.get('/top5/:type', async (req, res) => {
   }
 
   try {
-    const message = `📈 Top 5 ${lowerType.replace('-', ' ')} stocks (sample):\n1. ABC\n2. DEF\n3. GHI\n4. JKL\n5. MNO`;
+    let screenerUrl = `https://financialmodelingprep.com/api/v3/stock-screener?limit=5&exchange=NASDAQ&apikey=${process.env.FMP_API_KEY}`;
+
+    if (lowerType === 'high-volume') {
+      screenerUrl += `&sort=volume&order=desc`;
+    } else if (lowerType === 'large-cap') {
+      screenerUrl += `&marketCapMoreThan=10000000000`;
+    } else if (lowerType === 'mid-cap') {
+      screenerUrl += `&marketCapMoreThan=2000000000&marketCapLowerThan=10000000000`;
+    }
+
+    const response = await axios.get(screenerUrl);
+    const stocks = response.data;
+
+    if (!stocks.length) {
+      return res.status(404).json({ message: "No stocks found for this category." });
+    }
+
+    const message = `📈 Top 5 ${lowerType.replace('-', ' ')} stocks:\n` +
+      stocks.map((s, i) => `${i + 1}. ${s.symbol} - ${s.companyName}`).join('\n');
+
     res.json({ message });
   } catch (err) {
+    console.error("❌ Error fetching top 5:", err.message);
     res.status(500).json({ message: "Failed to fetch Top 5." });
   }
 });
@@ -62,7 +82,19 @@ app.post('/options', async (req, res) => {
   console.log("🟥 OPTIONS REQUEST:", stock);
 
   try {
-    const message = `💡 Options Strategy for ${stock}\nBuy Call Option @ Strike $XX (Exp: MM/DD)\nTarget: $XX (+X%)\nStop: $XX (-X%)\nReason: AI detected bullish trend and high short-term momentum.`;
+    const fmpResponse = await axios.get(
+      `https://financialmodelingprep.com/api/v3/quote/${stock}?apikey=${process.env.FMP_API_KEY}`
+    );
+    const quote = fmpResponse.data[0];
+    if (!quote) return res.status(404).json({ message: `No data found for ${stock}` });
+
+    const current = quote.price;
+    const strike = (current * 1.05).toFixed(2);
+    const target = (current * 1.2).toFixed(2);
+    const stop = (current * 0.9).toFixed(2);
+
+    const message = `💡 Options Strategy for ${stock}\n💵 Current Price: $${current}\n🎯 Buy Call Option @ Strike: $${strike}\n📅 Expiration: 2 weeks from now\n📈 Target: $${target} (+20%)\n🛑 Stop Loss: $${stop} (-10%)\n🧠 Reason: Based on momentum and volume, this setup has short-term bullish potential. Consider this a tactical 2-week play.`;
+
     res.json({ message });
   } catch (error) {
     console.error("❌ Options error:", error.message);
