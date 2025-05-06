@@ -102,18 +102,19 @@ Output:
   }
 });
 
-// 🔝 Top 5 AI Picks
+// 🔝 Top 5 AI Picks (Now includes price, target, stop)
 app.get('/top5', async (req, res) => {
   const prompt = `
-You are a swing trading strategist. Based on current market sentiment, technical patterns, and earnings trends, give me your Top 5 stock picks for today.
+You are a swing trading assistant. Based on today’s market data, give your top 5 stock picks.
 
-For each pick, include:
-- 📈 Stock Symbol & Name
-- 🎯 Target Gain %
-- 🛑 Suggested Stop loss %
-- 🧠 Short Reason Why
+For each, include:
+- 📈 Stock Symbol and Name
+- 💵 Current Price (in dollars)
+- 🎯 Target Price (in dollars)
+- 🛑 Stop Loss Price (in dollars)
+- 🧠 1-sentence Reason
 
-Add a quick reminder at the bottom that these are ideas, not financial advice.
+Format cleanly and add a reminder at the bottom that this is not financial advice.
   `;
 
   try {
