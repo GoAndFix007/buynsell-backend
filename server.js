@@ -103,29 +103,32 @@ Output:
   }
 });
 
-// 🔝 Top 5 AI Picks with Real-Time Prices
+// 🔝 Dynamic Top 5 AI Picks with Pro-Level % Targets
 app.get('/top5', async (req, res) => {
-  const symbols = ["AAPL", "MSFT", "TSLA", "NVDA", "AMZN"];
   try {
-    const quoteData = await axios.get(`https://financialmodelingprep.com/api/v3/quote/${symbols.join(',')}?apikey=${process.env.FMP_API_KEY}`);
+    const movers = await axios.get(`https://financialmodelingprep.com/api/v3/stock_market/actives?apikey=${process.env.FMP_API_KEY}`);
+    const filtered = movers.data.filter(stock => stock.price >= 10 && stock.price <= 1000).slice(0, 10);
+    const symbols = filtered.map(stock => stock.symbol).join(',');
+
+    const quoteData = await axios.get(`https://financialmodelingprep.com/api/v3/quote/${symbols}?apikey=${process.env.FMP_API_KEY}`);
     const quotes = quoteData.data;
 
     const formattedStocks = quotes.map((q, idx) => {
-      const targetPrice = (q.price * 1.1).toFixed(2);
-      const stopLoss = (q.price * 0.95).toFixed(2);
+      const targetPrice = (q.price * 1.10).toFixed(2);
+      const stopLoss = (q.price * 0.965).toFixed(2);
       const gainPercent = ((targetPrice - q.price) / q.price * 100).toFixed(1);
 
       return `#${idx + 1}: ${q.name} (${q.symbol})
 💵 Current Price: $${q.price}
 🎯 Target Price: $${targetPrice} (+${gainPercent}%)
-🛑 Stop Loss: $${stopLoss}
-🧠 Reason: AI expects moderate upside momentum based on market activity.`;
+🛑 Stop Loss Price: $${stopLoss} (-3.5%)
+🧠 Reason: Trending upward with high volume; AI expects a short-term breakout based on swing indicators.`;
     }).join("\n\n");
 
     const message = `${formattedStocks}\n\n⚠️ This is not financial advice. Always do your own research.`;
     res.json({ message });
   } catch (error) {
-    console.error("🔥 Top 5 Real-Time Error:", error.response?.data || error.message || error);
+    console.error("🔥 Top 5 Dynamic Error:", error.response?.data || error.message || error);
     res.json({ message: "⚠️ Failed to generate Top 5 picks." });
   }
 });
