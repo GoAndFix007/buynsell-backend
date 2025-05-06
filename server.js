@@ -1,4 +1,4 @@
-// ✅ Full server.js for BuyNSell 2.0
+// ✅ Full server.js for BuyNSell 2.0 with /top5 included
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -97,6 +97,35 @@ Format clearly.
   } catch (error) {
     console.error('🔥 Options API error:', error.response?.data || error.message || error);
     res.json({ message: "⚠️ Failed to generate options insight." });
+  }
+});
+
+// 🎯 GPT Top 5 Daily Swing Picks
+app.get('/top5', async (req, res) => {
+  console.log("📊 Fetching Top 5 swing picks");
+  try {
+    const prompt = `
+You are an expert swing trader. Based on technical analysis and market trends, give 5 high-confidence swing trade ideas for today. For each, include:
+
+- 📈 Stock symbol
+- 🎯 Target gain %
+- 🛑 Suggested stop loss
+- 🧠 Short reason why
+
+Format clearly.
+    `;
+
+    const aiResponse = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const message = aiResponse.choices[0].message.content;
+    console.log("🎯 Top 5 Picks Response:", message);
+    res.json({ message });
+  } catch (error) {
+    console.error('🔥 Top 5 API error:', error.response?.data || error.message || error);
+    res.json({ message: "⚠️ Failed to generate Top 5 picks." });
   }
 });
 
