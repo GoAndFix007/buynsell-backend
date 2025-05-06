@@ -1,4 +1,4 @@
-// ✅ Full server.js for BuyNSell 2.0 with /top5 included
+// Enhanced server.js for BuyNSell 2.0
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -15,10 +15,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// 📈 GPT Swing Trade Setup
+// 🧠 GPT Swing Trade Signal
 app.post('/gpt', async (req, res) => {
   const { stock } = req.body;
-  console.log("📩 Received request for stock:", stock);
+  console.log("📩 Request for:", stock);
 
   try {
     const [quote, rsi, macd, ma50, ma200] = await Promise.all([
@@ -29,24 +29,29 @@ app.post('/gpt', async (req, res) => {
       axios.get(`https://financialmodelingprep.com/api/v4/technical_indicator/sma/${stock}?period=200&apikey=${process.env.FMP_API_KEY}`),
     ]);
 
-    const q = quote.data[0];
+    const q = quote.data?.[0];
+    if (!q || !q.price) {
+      return res.json({ message: "⚠️ No valid price data available." });
+    }
+
     const prompt = `
-You are a professional swing trading assistant. Analyze the following stock based on technical indicators and recommend a swing trade setup (1–5 day outlook).
+You are a professional swing trading assistant. Analyze the stock below using technical indicators and current price to suggest a swing trade.
 
 Stock: ${stock}
-Price: $${q.price}
-Volume: ${q.volume}
-RSI: ${rsi.data[0]?.value || 'N/A'}
-MACD Signal: ${macd.data[0]?.signal || 'N/A'}
-50-day MA: ${ma50.data[0]?.value || 'N/A'}
-200-day MA: ${ma200.data[0]?.value || 'N/A'}
+Current Price: $${q.price}
+Volume: ${q.volume || 'N/A'}
+RSI: ${rsi.data?.[0]?.value || 'N/A'}
+MACD Signal: ${macd.data?.[0]?.signal || 'N/A'}
+50-day MA: ${ma50.data?.[0]?.value || 'N/A'}
+200-day MA: ${ma200.data?.[0]?.value || 'N/A'}
 
-Provide:
-- 📈 Recommendation (BUY / HOLD / SELL)
-- 🎯 Target Price (3–5 days)
-- 🛑 Stop Loss
-- 🧠 Short Reasoning
-    `;
+Based on this, provide a clear swing trade recommendation:
+- 📈 Recommendation: Buy / Hold / Sell
+- 🎯 Target Price (in dollars)
+- 🛑 Stop Loss Price (in dollars)
+- 🧠 Reasoning (1-2 short sentences)
+- 🗓️ Expected timeframe (3–5 days)
+`;
 
     const aiResponse = await openai.chat.completions.create({
       model: 'gpt-4',
@@ -54,15 +59,15 @@ Provide:
     });
 
     const message = aiResponse.choices[0].message.content;
-    console.log("🤖 Swing Trade Response:", message);
     res.json({ message });
+
   } catch (error) {
-    console.error('🔥 GPT API error:', error.response?.data || error.message || error);
+    console.error("🔥 GPT Error:", error.response?.data || error.message || error);
     res.json({ message: "⚠️ Failed to generate swing trade insight." });
   }
 });
 
-// 🔴 GPT Options Trade Setup
+// 🧠 GPT Options Trade Setup
 app.post('/options', async (req, res) => {
   const { stock } = req.body;
   console.log("📩 Received options request for:", stock);
@@ -78,13 +83,11 @@ Stock: ${stock}
 Price: $${q.price}
 
 Output:
-- 💹 Option Trade: Buy Call or Put @ Strike with Expiration Date
-- 🎯 Profit Target (e.g., +70%)
-- 🛑 Stop-Loss (e.g., -40%)
-- 🧠 Reasoning using technical indicators (MACD, RSI, trends)
-
-Format clearly.
-    `;
+- 💹 Option Trade: Buy Call/Put @ Strike with Expiration Date
+- 🎯 Profit Target (e.g., 70% gain)
+- 🛑 Stop-Loss (e.g., 50% drop)
+- 🧠 Reasoning
+`;
 
     const aiResponse = await openai.chat.completions.create({
       model: 'gpt-4',
@@ -92,7 +95,6 @@ Format clearly.
     });
 
     const message = aiResponse.choices[0].message.content;
-    console.log("📈 Options Trade Response:", message);
     res.json({ message });
   } catch (error) {
     console.error('🔥 Options API error:', error.response?.data || error.message || error);
@@ -100,36 +102,35 @@ Format clearly.
   }
 });
 
-// 🎯 GPT Top 5 Daily Swing Picks
+// 🔝 Top 5 AI Picks
 app.get('/top5', async (req, res) => {
-  console.log("📊 Fetching Top 5 swing picks");
+  const prompt = `
+You are a swing trading strategist. Based on current market sentiment, technical patterns, and earnings trends, give me your Top 5 stock picks for today.
+
+For each pick, include:
+- 📈 Stock Symbol & Name
+- 🎯 Target Gain %
+- 🛑 Suggested Stop loss %
+- 🧠 Short Reason Why
+
+Add a quick reminder at the bottom that these are ideas, not financial advice.
+  `;
+
   try {
-    const prompt = `
-You are an expert swing trader. Based on technical analysis and market trends, give 5 high-confidence swing trade ideas for today. For each, include:
-
-- 📈 Stock symbol
-- 🎯 Target gain %
-- 🛑 Suggested stop loss
-- 🧠 Short reason why
-
-Format clearly.
-    `;
-
     const aiResponse = await openai.chat.completions.create({
       model: 'gpt-4',
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: 'user', content: prompt }]
     });
 
     const message = aiResponse.choices[0].message.content;
-    console.log("🎯 Top 5 Picks Response:", message);
     res.json({ message });
   } catch (error) {
-    console.error('🔥 Top 5 API error:', error.response?.data || error.message || error);
+    console.error("🔥 Top 5 Error:", error.response?.data || error.message || error);
     res.json({ message: "⚠️ Failed to generate Top 5 picks." });
   }
 });
 
-// ✅ Start Server
+// ✅ Server Listen
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 BuyNSell 2.0 server live at http://localhost:${PORT}`);
