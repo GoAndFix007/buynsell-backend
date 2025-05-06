@@ -1,121 +1,76 @@
-// server.js (backend)
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const OpenAI = require('openai');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 10000;
-const FMP_API_KEY = process.env.FMP_API_KEY;
-
-// Helper to calculate % change
-function calculatePercentChange(current, target) {
-  return (((target - current) / current) * 100).toFixed(2);
-}
-
-async function fetchTop5Stocks(filterFn, fallbackMessage) {
-  try {
-    const volumeUrl = `https://financialmodelingprep.com/api/v3/actives?apikey=${FMP_API_KEY}`;
-    const volumeResponse = await axios.get(volumeUrl);
-    const actives = volumeResponse.data.filter(filterFn);
-    console.log("✅ Filtered active stocks:", actives.map(s => s.ticker));
-
-    if (!actives.length) {
-      return { message: fallbackMessage };
-    }
-
-    const topSymbols = actives.slice(0, 10).map(stock => stock.ticker);
-    const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${topSymbols.join(',')}?apikey=${FMP_API_KEY}`;
-    const response = await axios.get(quoteUrl);
-    const quotes = response.data.slice(0, 5);
-
-    if (!quotes.length) {
-      return { message: fallbackMessage };
-    }
-
-    const ideas = quotes.map((q, i) => {
-      const gainMultiplier = 1 + (Math.random() * 0.06 + 0.06); // 6%–12%
-      const stopMultiplier = 1 - (Math.random() * 0.03 + 0.03); // 3%–6%
-
-      const target = (q.price * gainMultiplier).toFixed(2);
-      const stopLoss = (q.price * stopMultiplier).toFixed(2);
-      const gainPct = calculatePercentChange(q.price, target);
-      const lossPct = calculatePercentChange(q.price, stopLoss);
-
-      return `
-${i + 1}️⃣ ${q.symbol} (${q.name})
-💵 Current Price: $${q.price.toFixed(2)}
-🎯 Target Price: $${target} (+${gainPct}%)
-🛑 Stop Loss Price: $${stopLoss} (-${Math.abs(lossPct)}%)
-🧠 Reason: ${q.name} shows favorable volume and sentiment. Great for swing trading.`;
-    });
-
-    return { message: ideas.join('\n') };
-  } catch (error) {
-    console.error('🔥 Top 5 Generation Error:', error);
-    return { message: fallbackMessage };
-  }
-}
-
-app.get('/top5/high-volume', async (req, res) => {
-  const result = await fetchTop5Stocks(
-    stock => stock.price > 5 && stock.marketCap > 2000000000,
-    "⚠️ No active high-volume stocks found."
-  );
-  res.json(result);
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-app.get('/top5/large-cap', async (req, res) => {
-  const result = await fetchTop5Stocks(
-    stock => stock.price > 5 && stock.marketCap > 10000000000,
-    "⚠️ No large-cap stocks active."
-  );
-  res.json(result);
-});
-
-app.get('/top5/mid-cap', async (req, res) => {
-  const result = await fetchTop5Stocks(
-    stock => stock.price > 5 && stock.marketCap >= 2000000000 && stock.marketCap <= 10000000000,
-    "⚠️ No active mid-cap stocks found."
-  );
-  res.json(result);
-});
-
+// Endpoint: Stock Signal
 app.post('/gpt', async (req, res) => {
   const { stock } = req.body;
+  console.log("📩 Received GPT request for:", stock);
 
   try {
-    const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${stock}?apikey=${FMP_API_KEY}`;
-    const response = await axios.get(quoteUrl);
-    const data = response.data[0];
+    const fmpResponse = await axios.get(
+      `https://financialmodelingprep.com/api/v3/quote/${stock}?apikey=${process.env.FMP_API_KEY}`
+    );
 
-    if (!data || !data.price) {
-      return res.status(404).json({ message: `⚠️ No data found for ${stock}.` });
-    }
+    const quote = fmpResponse.data[0];
+    if (!quote) return res.status(404).json({ message: `No data found for ${stock}` });
 
-    const price = data.price;
-    const target = (price * 1.08).toFixed(2); // Assume +8% gain
-    const stop = (price * 0.95).toFixed(2);   // Assume -5% risk
-    const gainPct = calculatePercentChange(price, target);
-    const lossPct = calculatePercentChange(price, stop);
+    const current = quote.price;
+    const target = (current * 1.08).toFixed(2);
+    const stop = (current * 0.95).toFixed(2);
 
-    const message = `
-📊 ${stock} Trade Idea
-💵 Current Price: $${price.toFixed(2)}
-🎯 Target Price: $${target} (+${gainPct}%)
-🛑 Stop Loss Price: $${stop} (${lossPct}%)
-🧠 Reasoning: ${stock} has shown favorable technical indicators and market sentiment suggesting short-term upside potential. Consider this a swing opportunity over the next 5–7 days.`;
+    const message = `📊 ${stock} Trade Idea\n🧮 Current Price: $${current}\n🎯 Target Price: $${target} (+8.00%)\n🛑 Stop Loss Price: $${stop} (-5.00%)\n🧠 Reasoning: ${stock} has shown favorable technical indicators and market sentiment suggesting short-term upside potential. Consider this a swing opportunity over the next 5–7 days.`;
 
     res.json({ message });
-  } catch (err) {
-    console.error('🔥 GPT Signal Error:', err.message);
-    res.status(500).json({ message: '⚠️ Failed to generate AI insight.' });
+  } catch (error) {
+    console.error("❌ Error fetching quote:", error.message);
+    res.status(500).json({ message: "Failed to generate AI insight." });
   }
 });
 
+// Endpoint: Top 5 by Type
+app.get('/top5/:type', async (req, res) => {
+  const { type } = req.params;
+  const lowerType = type.toLowerCase();
+  const validTypes = ['high-volume', 'large-cap', 'mid-cap'];
+
+  if (!validTypes.includes(lowerType)) {
+    return res.status(400).json({ message: "Invalid Top 5 type." });
+  }
+
+  try {
+    const message = `📈 Top 5 ${lowerType.replace('-', ' ')} stocks (sample):\n1. ABC\n2. DEF\n3. GHI\n4. JKL\n5. MNO`;
+    res.json({ message });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch Top 5." });
+  }
+});
+
+// Endpoint: Options Signal
+app.post('/options', async (req, res) => {
+  const { stock } = req.body;
+  console.log("🟥 OPTIONS REQUEST:", stock);
+
+  try {
+    const message = `💡 Options Strategy for ${stock}\nBuy Call Option @ Strike $XX (Exp: MM/DD)\nTarget: $XX (+X%)\nStop: $XX (-X%)\nReason: AI detected bullish trend and high short-term momentum.`;
+    res.json({ message });
+  } catch (error) {
+    console.error("❌ Options error:", error.message);
+    res.status(500).json({ message: "Failed to generate options insight." });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 BuyNSell 2.0 server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
