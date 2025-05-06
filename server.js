@@ -104,33 +104,43 @@ Output:
   }
 });
 
-// 🔝 Dynamic Top 5 AI Picks with Pro-Level % Targets
+// 🔝 Dynamic Top 5 AI Picks with Real Indicators
 app.get('/top5', async (req, res) => {
   try {
     const movers = await axios.get(`https://financialmodelingprep.com/api/v3/stock_market/actives?apikey=${process.env.FMP_API_KEY}`);
     const filtered = movers.data.filter(stock => stock.price >= 10 && stock.price <= 1000).slice(0, 5);
-    const symbols = filtered.map(stock => stock.symbol).join(',');
 
-    const quoteData = await axios.get(`https://financialmodelingprep.com/api/v3/quote/${symbols}?apikey=${process.env.FMP_API_KEY}`);
-    const quotes = quoteData.data;
+    const enrichedData = await Promise.all(
+      filtered.map(async (stock) => {
+        const [quote, rsi, macd, ma50, ma200] = await Promise.all([
+          axios.get(`https://financialmodelingprep.com/api/v3/quote/${stock.symbol}?apikey=${process.env.FMP_API_KEY}`),
+          axios.get(`https://financialmodelingprep.com/api/v4/technical_indicator/rsi/${stock.symbol}?apikey=${process.env.FMP_API_KEY}`),
+          axios.get(`https://financialmodelingprep.com/api/v4/technical_indicator/macd/${stock.symbol}?apikey=${process.env.FMP_API_KEY}`),
+          axios.get(`https://financialmodelingprep.com/api/v4/technical_indicator/sma/${stock.symbol}?period=50&apikey=${process.env.FMP_API_KEY}`),
+          axios.get(`https://financialmodelingprep.com/api/v4/technical_indicator/sma/${stock.symbol}?period=200&apikey=${process.env.FMP_API_KEY}`),
+        ]);
 
-    const formattedStocks = quotes.map((q, idx) => {
-      const targetPrice = (q.price * 1.10).toFixed(2);
-      const stopLoss = (q.price * 0.965).toFixed(2);
-      const gainPercent = ((targetPrice - q.price) / q.price * 100).toFixed(1);
+        const q = quote.data[0];
+        const targetPrice = (q.price * 1.10).toFixed(2);
+        const stopLoss = (q.price * 0.965).toFixed(2);
+        const gainPercent = ((targetPrice - q.price) / q.price * 100).toFixed(1);
 
-      return `#${idx + 1}: ${q.name} (${q.symbol})
-💵 Current Price: $${q.price}
-🎯 Target Price: $${targetPrice} (+${gainPercent}%)
-🛑 Stop Loss Price: $${stopLoss} (-3.5%)
-🧠 Reason: Trending upward with high volume; AI expects a breakout within 3–5 days.`;
-    }).join("\n\n");
+        return `📈 ${q.name} (${q.symbol})
+💵 Price: $${q.price}
+🎯 Target: $${targetPrice} (+${gainPercent}%)
+🛑 Stop: $${stopLoss} (-3.5%)
+📊 RSI: ${rsi.data?.[0]?.value || 'N/A'} | MACD: ${macd.data?.[0]?.signal || 'N/A'}
+📉 MA50: ${ma50.data?.[0]?.value || 'N/A'} | MA200: ${ma200.data?.[0]?.value || 'N/A'}
+🧠 Reason: Momentum building. Indicators suggest breakout potential in 3–5 days.`;
+      })
+    );
 
-    const message = `${formattedStocks}\n\n⚠️ This is not financial advice. Always do your own research.`;
+    const message = `${enrichedData.join("\n\n")}
+\n⚠️ This is not financial advice. Do your own research.`;
     res.json({ message });
   } catch (error) {
-    console.error("🔥 Top 5 Dynamic Error:", error.response?.data || error.message || error);
-    res.json({ message: "⚠️ Failed to generate Top 5 picks." });
+    console.error("🔥 Top 5 Indicator Error:", error.response?.data || error.message || error);
+    res.json({ message: "⚠️ Failed to generate enriched Top 5." });
   }
 });
 
