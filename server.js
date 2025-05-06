@@ -88,6 +88,7 @@ Output:
 - 🎯 Profit Target (e.g., 70% gain)
 - 🛑 Stop-Loss (e.g., 50% drop)
 - 🧠 Reasoning
+- 🗓️ Expected timeframe (in days)
 `;
 
     const aiResponse = await openai.chat.completions.create({
@@ -107,7 +108,7 @@ Output:
 app.get('/top5', async (req, res) => {
   try {
     const movers = await axios.get(`https://financialmodelingprep.com/api/v3/stock_market/actives?apikey=${process.env.FMP_API_KEY}`);
-    const filtered = movers.data.filter(stock => stock.price >= 10 && stock.price <= 1000).slice(0, 10);
+    const filtered = movers.data.filter(stock => stock.price >= 10 && stock.price <= 1000).slice(0, 5);
     const symbols = filtered.map(stock => stock.symbol).join(',');
 
     const quoteData = await axios.get(`https://financialmodelingprep.com/api/v3/quote/${symbols}?apikey=${process.env.FMP_API_KEY}`);
@@ -122,7 +123,7 @@ app.get('/top5', async (req, res) => {
 💵 Current Price: $${q.price}
 🎯 Target Price: $${targetPrice} (+${gainPercent}%)
 🛑 Stop Loss Price: $${stopLoss} (-3.5%)
-🧠 Reason: Trending upward with high volume; AI expects a short-term breakout based on swing indicators.`;
+🧠 Reason: Trending upward with high volume; AI expects a breakout within 3–5 days.`;
     }).join("\n\n");
 
     const message = `${formattedStocks}\n\n⚠️ This is not financial advice. Always do your own research.`;
