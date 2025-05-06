@@ -33,8 +33,11 @@ app.get('/top5', async (req, res) => {
     const quotes = response.data;
 
     const ideas = quotes.map((q, i) => {
-      const stopLoss = (q.price * 0.98).toFixed(2);
-      const target = (q.price * 1.05).toFixed(2);
+      const gainMultiplier = 1 + (Math.random() * 0.06 + 0.06); // 6%–12%
+      const stopMultiplier = 1 - (Math.random() * 0.03 + 0.03); // 3%–6%
+
+      const target = (q.price * gainMultiplier).toFixed(2);
+      const stopLoss = (q.price * stopMultiplier).toFixed(2);
       const gainPct = calculatePercentChange(q.price, target);
       const lossPct = calculatePercentChange(q.price, stopLoss);
 
